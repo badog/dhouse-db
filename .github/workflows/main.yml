@@ -91,8 +91,14 @@ jobs:
           DEPLOY_PORT: ${{ secrets.DEPLOY_PORT }}
         run: |
           set -euo pipefail
+          if [ -z "${DEPLOY_URL:-}" ]; then
+            echo "DEPLOY_URL secret is required to configure CI4 app.baseURL."
+            exit 1
+          fi
+
           PORT="${DEPLOY_PORT:-22}"
           ARCHIVE="ci4-release-${GITHUB_SHA}.tar.gz"
+          printf -v DEPLOY_URL_Q '%q' "$DEPLOY_URL"
 
           ssh \
             -i ~/.ssh/deploy_key \
@@ -118,7 +124,7 @@ jobs:
             -o IdentitiesOnly=yes \
             -o StrictHostKeyChecking=yes \
             "$DEPLOY_USER@$DEPLOY_HOST" \
-            "DEPLOY_PATH='$DEPLOY_PATH' ARCHIVE='$ARCHIVE' bash -se" <<'REMOTE'
+            "DEPLOY_PATH='$DEPLOY_PATH' ARCHIVE='$ARCHIVE' DEPLOY_URL=$DEPLOY_URL_Q bash -se" <<'REMOTE'
           set -euo pipefail
           cd "$DEPLOY_PATH"
           test -f "$ARCHIVE"
@@ -129,6 +135,31 @@ jobs:
           test -f spark
           test -f vendor/autoload.php
           test -w writable
+          test -f .env
+
+          DEPLOY_URL="$DEPLOY_URL" php -r '
+          $url = getenv("DEPLOY_URL");
+          if (filter_var($url, FILTER_VALIDATE_URL) === false) {
+              fwrite(STDERR, "DEPLOY_URL must be a complete URL, such as https://example.com/\n");
+              exit(1);
+          }
+
+          $path = ".env";
+          $contents = is_file($path) ? file_get_contents($path) : "";
+          $line = "app.baseURL = " . var_export($url, true);
+          $pattern = "/^[ \\t]*#?[ \\t]*app\\.baseURL[ \\t]*=.*$/m";
+
+          if (preg_match($pattern, $contents) === 1) {
+              $contents = preg_replace($pattern, $line, $contents, 1);
+          } else {
+              $contents = rtrim($contents) . "\n" . $line . "\n";
+          }
+
+          if (file_put_contents($path, $contents) === false) {
+              fwrite(STDERR, "Could not update .env app.baseURL.\n");
+              exit(1);
+          }
+          '
 
           php spark routes > /dev/null
           echo "CI4 release deployed and bootstrap verified."
