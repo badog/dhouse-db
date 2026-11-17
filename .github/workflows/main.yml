@@ -39,6 +39,16 @@ jobs:
       - name: Install production dependencies
         run: composer install --no-dev --prefer-dist --no-interaction --no-progress --optimize-autoloader
 
+      - name: Prepare writable directories
+        run: |
+          mkdir -p \
+            writable/cache \
+            writable/logs \
+            writable/session \
+            writable/uploads \
+            writable/debugbar
+          chmod -R u+rwX writable
+
       - name: Check CI4 application bootstrap
         run: php spark routes
 
@@ -53,6 +63,9 @@ jobs:
             --exclude='./phpunit.dist.xml' \
             --exclude='./writable/cache/*' \
             --exclude='./writable/logs/*' \
+            --exclude='./writable/session/*' \
+            --exclude='./writable/uploads/*' \
+            --exclude='./writable/debugbar/*' \
             -czf "$RUNNER_TEMP/ci4-release.tar.gz" .
 
       - name: Configure SSH
