@@ -1,4 +1,9 @@
 <?php
+exit;
+
+
+
+
 
 use CodeIgniter\Boot;
 use Config\Paths;
