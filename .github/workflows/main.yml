@@ -49,6 +49,9 @@ jobs:
             writable/debugbar
           chmod -R u+rwX writable
 
+      - name: Set base URL for CI bootstrap
+        run: printf '%s\n' 'app.baseURL = "http://localhost/"' > .env
+
       - name: Check CI4 application bootstrap
         run: php spark routes
 
