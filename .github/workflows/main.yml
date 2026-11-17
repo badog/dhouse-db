@@ -174,12 +174,16 @@ jobs:
           fi
 
           for attempt in $(seq 1 20); do
-            HTTP_CODE="$(curl --silent --output /dev/null --write-out '%{http_code}' --max-time 10 "$DEPLOY_URL" || true)"
+            CURL_ERROR_FILE="$RUNNER_TEMP/deploy-health-curl-error.txt"
+            HTTP_CODE="$(curl --silent --show-error --output /dev/null --write-out '%{http_code}' --max-time 10 "$DEPLOY_URL" 2>"$CURL_ERROR_FILE" || true)"
             if [[ "$HTTP_CODE" =~ ^[23][0-9][0-9]$ ]]; then
               echo "Site responded with HTTP $HTTP_CODE."
               exit 0
             fi
-            echo "Waiting for site response... ($attempt/20)"
+            echo "Waiting for site response... ($attempt/20; HTTP ${HTTP_CODE:-000})"
+            if [ -s "$CURL_ERROR_FILE" ]; then
+              sed 's/^/curl: /' "$CURL_ERROR_FILE"
+            fi
             sleep 3
           done
 
